@@ -1,6 +1,6 @@
 document.addEventListener("DOMContentLoaded", () => {
   addMessageWithIcon(
-    "こんにちは🌟 FSC AIです！😊<br>知りたいことを選んでください✨",
+    "こんにちは🌟 FSC AIです！😊<br>ご希望のサポートをお選びください✨",
     "FSC AI",
     "sent",
     true
@@ -13,7 +13,7 @@ function resetChat() {
   const messageContainer = document.querySelector(".chat-messages");
   messageContainer.innerHTML = ""; // 全メッセージクリア
   addMessageWithIcon(
-    "こんにちは🌟 FSC AIです！😊<br>知りたいことを選んでください✨",
+    "こんにちは🌟 FSC AIです！😊<br>ご希望のサポートをお選びください✨",
     "FSC AI",
     "sent",
     true
