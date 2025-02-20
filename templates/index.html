@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LINE風AIチャットFSC AI</title>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='normalize.css') }}"
+    />
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='styles.css') }}"
+    />
+    <!-- Tailwind CSS -->
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='output.css') }}"
+    />
+  </head>
+  <body>
+    <div class="chat-container">
+      <div class="chat-box">
+        <!-- メッセージ表示エリア -->
+        <div class="chat-messages"></div>
+
+        <!-- メッセージ入力エリア -->
+        <form
+          id="chat-form"
+          class="chat-input"
+          onsubmit="processProductName(event)"
+        >
+          <input
+            type="text"
+            id="user_input"
+            name="user_input"
+            placeholder="メッセージを入力..."
+            required
+          />
+          <button type="submit" class="submit-button">🚀 送信</button>
+          <button type="button" class="reset-button" onclick="resetChat()">
+            🔄 リセット
+          </button>
+        </form>
+      </div>
+    </div>
+    <script src="{{ url_for('static', filename='js/chat.js') }}"></script>
+  </body>
+</html>
