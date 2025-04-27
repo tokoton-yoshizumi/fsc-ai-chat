@@ -6,6 +6,9 @@ document.addEventListener("DOMContentLoaded", () => {
     true
   );
   showInitialChoices();
+  document
+    .getElementById("chat-form")
+    .addEventListener("submit", processUserInput);
 });
 
 // チャットをリセットして初期状態に戻す関数
@@ -122,18 +125,21 @@ function showLinkMessage(message, link) {
 }
 
 // **製品名送信後、見出しリストを取得**
-async function processProductName(event) {
-  event.preventDefault(); // ページリロードを防ぐ
+async function processUserInput(event) {
+  event.preventDefault();
 
   const userInputElement = document.getElementById("user_input");
   const userInput = userInputElement.value.trim();
 
   if (!userInput) return;
 
-  if (userInputElement.dataset.inputType === "product") {
-    addMessageWithIcon(userInput, "ユーザー", "received", false);
+  addMessageWithIcon(userInput, "ユーザー", "received", false);
 
+  if (userInputElement.dataset.inputType === "product") {
+    // 製品名入力のとき
     try {
+      showLoadingMessage(); // 🔥 ローディング出す
+
       const response = await fetch("/get_product_info", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -141,6 +147,8 @@ async function processProductName(event) {
       });
 
       const data = await response.json();
+
+      removeLoadingMessage(); // 🔥 ローディング消す
 
       if (data.choices && data.choices.length > 0) {
         addMessageWithIcon(
@@ -150,7 +158,6 @@ async function processProductName(event) {
           true
         );
 
-        // **見出しの選択肢を表示**
         showSubChoices(
           data.choices,
           "以下の見出しから選んでください🔽",
@@ -166,6 +173,40 @@ async function processProductName(event) {
       }
     } catch (error) {
       console.error("Error fetching product info:", error);
+      removeLoadingMessage();
+      addMessageWithIcon(
+        "エラーが発生しました😓。もう一度お試しください。",
+        "FSC AI",
+        "sent",
+        true
+      );
+    }
+  } else if (userInputElement.dataset.inputType === "question") {
+    // 見出しを選んだ後の質問入力のとき
+    try {
+      showLoadingMessage(); // 🔥 ローディング出す
+
+      const response = await fetch("/get_answer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          url: userInputElement.dataset.url,
+          heading: userInputElement.dataset.heading,
+          question: userInput,
+        }),
+      });
+
+      const data = await response.json();
+
+      removeLoadingMessage(); // 🔥 ローディング消す
+      addMessageWithIcon(data.bot_response, "FSC AI", "sent", true, true);
+
+      if (data.show_contact) {
+        askContactOptions();
+      }
+    } catch (error) {
+      console.error("❌ fetchエラー:", error);
+      removeLoadingMessage();
       addMessageWithIcon(
         "エラーが発生しました😓。もう一度お試しください。",
         "FSC AI",
@@ -174,6 +215,8 @@ async function processProductName(event) {
       );
     }
   }
+
+  userInputElement.value = "";
 }
 
 // **h2 を選択した後、質問入力モードにする**
@@ -225,60 +268,19 @@ function showSubChoices(choices, promptText, url) {
   messageContainer.scrollTop = messageContainer.scrollHeight;
 }
 
-// **フォーム送信時の処理**
-async function processUserInput(event) {
-  event.preventDefault();
-
-  const userInputElement = document.getElementById("user_input");
-  const userInput = userInputElement.value.trim();
-
-  if (!userInput) return;
-
-  if (userInputElement.dataset.inputType === "question") {
-    addMessageWithIcon(userInput, "ユーザー", "received", false);
-
-    try {
-      const response = await fetch("/get_answer", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          url: userInputElement.dataset.url,
-          heading: userInputElement.dataset.heading,
-          question: userInput,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTPエラー: ${response.status}`);
-      }
-
-      const data = await response.json();
-      addMessageWithIcon(data.bot_response, "FSC AI", "sent", true);
-
-      if (data.show_contact) {
-        askContactOptions();
-      }
-    } catch (error) {
-      console.error("❌ fetchエラー:", error);
-      addMessageWithIcon(
-        "エラーが発生しました😓。もう一度お試しください。",
-        "FSC AI",
-        "sent",
-        true
-      );
-    }
-
-    userInputElement.value = "";
-  }
-}
-
 // **フォームの送信イベントを監視**
 document
   .getElementById("chat-form")
   .addEventListener("submit", processUserInput);
 
 // **メッセージを追加する関数（AI のみアイコン付き）**
-function addMessageWithIcon(content, sender, className, isAI) {
+function addMessageWithIcon(
+  content,
+  sender,
+  className,
+  isAI,
+  showOperatorButton = false
+) {
   const messageContainer = document.querySelector(".chat-messages");
   const message = document.createElement("div");
   message.classList.add("message", className);
@@ -292,10 +294,55 @@ function addMessageWithIcon(content, sender, className, isAI) {
 
   const textWrapper = document.createElement("div");
   textWrapper.classList.add("message-text");
-  textWrapper.innerHTML = `<p>${content}</p><p class="time">${sender}</p>`;
 
+  let innerHTML = `<p>${content}</p>`;
+
+  if (showOperatorButton) {
+    innerHTML += `
+      <div style="margin-top: 10px;">
+        <button class="operator-button choice-button" onclick="redirectToContact()">📩お問い合わせはこちら</button>
+      </div>
+    `;
+  }
+
+  innerHTML += `<p class="time">${sender}</p>`;
+
+  textWrapper.innerHTML = innerHTML;
   message.appendChild(textWrapper);
   messageContainer.appendChild(message);
 
   messageContainer.scrollTop = messageContainer.scrollHeight;
+}
+
+let loadingMessage = null; // グローバルにローディングメッセージを保持
+
+function showLoadingMessage() {
+  const messageContainer = document.querySelector(".chat-messages");
+  loadingMessage = document.createElement("div");
+  loadingMessage.classList.add("message", "sent");
+
+  const icon = document.createElement("img");
+  icon.src = "/static/images/icon.png";
+  icon.classList.add("message-icon");
+  loadingMessage.appendChild(icon);
+
+  const textWrapper = document.createElement("div");
+  textWrapper.classList.add("message-text");
+  textWrapper.innerHTML = `<p>🧠 回答を考えています...</p><p class="time">FSC AI</p>`;
+
+  loadingMessage.appendChild(textWrapper);
+  messageContainer.appendChild(loadingMessage);
+
+  messageContainer.scrollTop = messageContainer.scrollHeight;
+}
+
+function removeLoadingMessage() {
+  if (loadingMessage) {
+    loadingMessage.remove();
+    loadingMessage = null;
+  }
+}
+
+function redirectToContact() {
+  window.open("https://fujiwarasangyo.jp/form-contact/", "_blank");
 }
