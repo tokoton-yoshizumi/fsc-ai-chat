@@ -5,9 +5,16 @@ from janome.tokenizer import Tokenizer
 
 api = Blueprint("api", __name__)
 
+print("🔄 サイトのコンテンツデータを読み込んでいます...")
+ALL_PAGES_DATA = load_existing_data("site_content.json")
+if ALL_PAGES_DATA:
+    print(f"✅ 全{len(ALL_PAGES_DATA)}ページのデータをメモリに読み込みました。")
+else:
+    print("⚠️ コンテンツデータが見つからないか、空です。")
+
 # --- 簡易的なキーワード検索機能 ---
 def search_content(question):
-    all_pages = load_existing_data("site_content.json")
+    all_pages = ALL_PAGES_DATA
     if not all_pages:
         return []
 
