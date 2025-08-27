@@ -38,11 +38,15 @@ def get_product_info():
 def get_answer():
     data = request.json
     url = data.get("url")
+    TRUSTED_DOMAIN = "https://fujiwarasangyo.jp/"
     heading = data.get("heading")
     question = data.get("question")
 
     if not url or not heading or not question:
         return jsonify({"error": "無効なリクエスト"}), 400
+    
+    if not url or not url.startswith(TRUSTED_DOMAIN):
+        return jsonify({"error": "無効なURLです"}), 400
 
     # 指定された見出し以下のコンテンツを取得
     section_content = fetch_section_content(url, heading)

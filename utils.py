@@ -2,6 +2,8 @@ import os
 import json
 import requests
 from bs4 import BeautifulSoup
+import re
+
 
 # ユーザーエージェント設定
 HEADERS = {
@@ -42,6 +44,12 @@ def fetch_section_content(url, heading):
         soup = BeautifulSoup(response.text, "html.parser")
         headings = soup.find_all("h2")  # h2 のみを取得
 
+        safe_heading = re.sub(r'[^a-zA-Z0-9_]', '', heading.replace(' ', '_'))
+        filename = f"output_{safe_heading}.txt"
+
+        if not safe_heading:
+            filename = "output_default.txt" # もしファイル名が空になった場合の対策
+
         print(f"🔍 {url} の h2 見出しリスト:")
         for h in headings:
             print(f" - {h.get_text().strip()}")
@@ -66,7 +74,6 @@ def fetch_section_content(url, heading):
                 print(f"🔹 取得したコンテンツ: {result[:100]}...")  # 100文字だけ表示
 
                 # **ファイルに出力**
-                filename = f"output_{heading.replace(' ', '_')}.txt"  # ファイル名に見出しを使う
                 with open(filename, "w", encoding="utf-8") as f:
                     f.write(f"【{heading}】\n{result}")
 
