@@ -21,6 +21,7 @@ EXCLUDE_URLS = [
     "https://fujiwarasangyo.jp/rockbolt-form/",
     "https://fujiwarasangyo.jp/form-rental/",
     "https://fujiwarasangyo.jp/calibratio-repair/",
+    "https://fujiwarasangyo.jp/number-view/"
     # 他にも除外したいページがあればここに追加
 ]
 def clean_html(html_content):
