@@ -1,71 +1,93 @@
+# scheduler.py (新しい完成版コード)
+
 import requests
 import json
-import xml.etree.ElementTree as ET
+import re
+from bs4 import BeautifulSoup
 import schedule
 import time
 from threading import Thread
-from utils import load_existing_data, get_page_title
 
-PAGE_SITEMAP_URL = "https://fujiwarasangyo.jp/page-sitemap.xml"
-HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-}
+# --- create_database.py から持ってきたロジック ---
 
-def get_page_urls(sitemap_url):
-    """Sitemap から固定ページの URL を取得"""
-    try:
-        response = requests.get(sitemap_url, headers=HEADERS, timeout=10)
-        response.raise_for_status()
-        root = ET.fromstring(response.text)
-        namespaces = {'ns': 'http://www.sitemaps.org/schemas/sitemap/0.9'}
-        urls = [elem.text for elem in root.findall(".//ns:loc", namespaces)]
-        return urls
-    except requests.exceptions.RequestException as e:
-        print(f"❌ Sitemap の取得に失敗しました: {e}")
-        return []
+PAGES_API_URL = "https://fujiwarasangyo.jp/wp-json/wp/v2/pages?per_page=100"
+POSTS_API_URL = "https://fujiwarasangyo.jp/wp-json/wp/v2/posts?per_page=100"
 
-def update_sitemap():
-    """週に1回 sitemap を取得して JSON を更新"""
-    print("🔄 Sitemap から最新のデータを取得中...")
+
+EXCLUDE_URLS = [
+    "https://fujiwarasangyo.jp/", # トップページ
+    "https://fujiwarasangyo.jp/form-contact/",
+    "https://fujiwarasangyo.jp/order/",
+    "https://fujiwarasangyo.jp/rockbolt-form/",
+    "https://fujiwarasangyo.jp/form-rental/",
+    "https://fujiwarasangyo.jp/calibratio-repair/",
+    # 他にも除外したいページがあればここに追加
+]
+def clean_html(html_content):
+    soup = BeautifulSoup(html_content, "html.parser")
+    text = soup.get_text()
+    text = re.sub(r'\s{2,}', '\n', text).strip()
+    return text
+
+def fetch_all_content(api_url):
+    all_items = []
+    page = 1
+    while True:
+        try:
+            response = requests.get(f"{api_url}&page={page}", timeout=20)
+            response.raise_for_status()
+            items = response.json()
+            if not items:
+                break
+            all_items.extend(items)
+            page += 1
+        except requests.exceptions.RequestException as e:
+            print(f"❌ APIからのデータ取得に失敗しました: {e}")
+            break
+    return all_items
+
+def update_database():
+    """サイトの全コンテンツを取得してJSONファイルを更新する"""
+    print("🔄 [スケジューラー] データベースの定期更新を開始します...")
     
-    fixed_page_urls = get_page_urls(PAGE_SITEMAP_URL)
-    existing_page_data = load_existing_data("fixed_page_titles.json")
-    existing_urls = {entry["url"] for entry in existing_page_data}
-
-    new_page_data = []
-    total_pages = len(fixed_page_urls)
-    print(f"📌 取得対象の固定ページ数: {total_pages}")
-
-    for index, url in enumerate(fixed_page_urls, start=1):
-        if url in existing_urls:
-            print(f"[{index}/{total_pages}] {url} は取得済み ✅ スキップ")
+    pages = fetch_all_content(PAGES_API_URL)
+    posts = fetch_all_content(POSTS_API_URL)
+    all_content = pages + posts
+    
+    site_data = []
+    for item in all_content:
+        url = item.get('link', '')
+        if url in EXCLUDE_URLS:
+            print(f"🚫 スキップ (除外リスト): {item.get('title', {}).get('rendered', '')}")
             continue
+        if 'content' in item and 'rendered' in item['content'] and item['content']['rendered']:
+            title = item.get('title', {}).get('rendered', 'No Title')
+            html_content = item['content']['rendered']
+            cleaned_content = clean_html(html_content)
+            site_data.append({"title": title, "url": url, "content": cleaned_content})
 
-        print(f"[{index}/{total_pages}] {url} を処理中...", end=" ")
-        title = get_page_title(url)
-        if title:
-            new_page_data.append({"url": url, "title": title})
-            print("✅ 取得成功")
-        else:
-            print("❌ 取得失敗")
+    with open("site_content.json", "w", encoding="utf-8") as f:
+        json.dump(site_data, f, ensure_ascii=False, indent=2)
 
-    # 既存データに新しいデータを追加
-    updated_page_data = existing_page_data + new_page_data
+    print(f"✅ [スケジューラー] 全{len(site_data)}ページのデータで `site_content.json` を更新しました。")
 
-    # JSON に保存
-    with open("fixed_page_titles.json", "w", encoding="utf-8") as f:
-        json.dump(updated_page_data, f, ensure_ascii=False, indent=4)
+# --- ここまでが create_database.py のロジック ---
 
-    print("✅ 最新のデータに更新しました！")
 
 # **スケジューラーの設定**
-schedule.every().week.do(update_sitemap)
+# 毎週月曜日の早朝3時にデータベースを更新するように設定
+schedule.every().monday.at("03:00").do(update_database)
+
 
 def start_scheduler():
     """バックグラウンドでスケジュールを実行"""
+    # ★ サーバー起動時に一度だけ即時実行する
+    print("🚀 [初回実行] データベースを最新の状態に更新します...")
+    update_database()
+    
     def run_scheduler():
         while True:
             schedule.run_pending()
-            time.sleep(60)
+            time.sleep(1) # 1秒ごとに次のスケジュールを確認
 
     Thread(target=run_scheduler, daemon=True).start()

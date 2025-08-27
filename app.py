@@ -5,10 +5,15 @@ from scheduler import start_scheduler  # スケジューラーをインポート
 app = Flask(__name__)
 app.register_blueprint(api)  # `routes.py` を Blueprint として登録
 
+# ★★★ スケジューラーをここで開始する ★★★
+start_scheduler()
+
 @app.route("/")
 def index():
     return render_template("index.html")
 
+# if __name__ == "__main__": のブロックは、
+# Heroku(gunicorn)では使われないため、削除しても、そのままでもOKです。
+# ローカルで python app.py と実行したい場合のために残しておいても良いでしょう。
 if __name__ == "__main__":
-    start_scheduler()  # 定期処理を開始
-    app.run(debug=True, threaded=True)  # `threaded=True` で並列実行
+    app.run(debug=True)
