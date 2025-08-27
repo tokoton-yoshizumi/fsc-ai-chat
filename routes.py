@@ -1,7 +1,6 @@
 from flask import Blueprint, request, jsonify
 from utils import load_existing_data # 既存の関数を流用
 from openai_api import chat_with_openai
-from janome.tokenizer import Tokenizer
 
 api = Blueprint("api", __name__)
 
@@ -13,18 +12,29 @@ else:
     print("⚠️ コンテンツデータが見つからないか、空です。")
 
 # --- 簡易的なキーワード検索機能 ---
+# --- 軽量なキーワード検索機能 ---
 def search_content(question):
     all_pages = ALL_PAGES_DATA
     if not all_pages:
         return []
 
-    t = Tokenizer()
-    keywords = []
-    for token in t.tokenize(question):
-        part_of_speech = token.part_of_speech.split(',')[0]
-        if part_of_speech == '名詞':
-            keywords.append(token.surface)
+    # Janomeの代わりに、不要な単語（ストップワード）を削除する方式に変更
+    stop_words = [
+        "の", "に", "は", "を", "た", "が", "で", "て", "と", "し", "れ", "さ", "ある", "いる", "も", 
+        "する", "から", "な", "こと", "もの", "へ", "より", "です", "ます", "でした", "ました",
+        "ください", "よう", "について", "における", "に関して", "対して", "どの", "どのくらい",
+        "何", "なぜ", "いつ", "どこ", "だれ", "どうして", "教えて"
+    ]
     
+    # 質問文からストップワードを空文字に置換して削除
+    temp_question = question
+    for word in stop_words:
+        temp_question = temp_question.replace(word, " ")
+
+    # 連続する空白を一つにまとめ、キーワードリストを作成
+    keywords = [kw for kw in temp_question.split() if kw]
+
+    # もしキーワードが抽出できなかった場合は、元の質問をそのまま使う
     if not keywords:
         keywords = [question]
     
@@ -33,13 +43,11 @@ def search_content(question):
     scored_pages = []
     for page in all_pages:
         score = 0
-        # ★★★ 新しいスコアリングロジック ★★★
         for keyword in keywords:
-            # 1. タイトルに含まれていたら、非常に高い点数を加算
+            # タイトルに含まれていたら高スコア
             if keyword.lower() in page['title'].lower():
                 score += 10
-            
-            # 2. 本文に含まれている回数も点数として加算
+            # 本文に含まれる回数をスコアに加算
             score += page['content'].lower().count(keyword.lower())
 
         if score > 0:
@@ -47,7 +55,6 @@ def search_content(question):
 
     scored_pages.sort(key=lambda x: x['score'], reverse=True)
     
-    # ★★★ ユーザーに見せるために、上位3件のページを返すように変更 ★★★
     return [item['page'] for item in scored_pages[:3]]
 # --- 新しいAPIエンドポイント ---
 @api.route("/ask", methods=["POST"])
@@ -72,8 +79,16 @@ def ask():
 
     # 3. AIに渡すコンテキストを「main_page」からのみ作成
     context = ""
-    t = Tokenizer()
-    keywords = [token.surface for token in t.tokenize(question) if token.part_of_speech.split(',')[0] == '名詞']
+    stop_words = [
+        "の", "に", "は", "を", "た", "が", "で", "て", "と", "し", "れ", "さ", "ある", "いる", "も", 
+        "する", "から", "な", "こと", "もの", "へ", "より", "です", "ます", "でした", "ました",
+        "ください", "よう", "について", "における", "に関して", "対して", "どの", "どのくらい",
+        "何", "なぜ", "いつ", "どこ", "だれ", "どうして", "教えて"
+    ]
+    temp_question = question
+    for word in stop_words:
+        temp_question = temp_question.replace(word, " ")
+    keywords = [kw for kw in temp_question.split() if kw]
     if not keywords:
         keywords = question.split()
 
