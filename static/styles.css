@@ -163,3 +163,45 @@ button.reset-button {
 button.reset-button:hover {
   color: #0464b2da;
 }
+
+/* 関連ページセクションのスタイル */
+.sources {
+  font-size: 0.8rem;
+  margin-top: 10px;
+  padding: 10px;
+  background-color: #f0f8ff; /* 薄い青色 */
+  border-radius: 5px;
+}
+
+.sources ul {
+  list-style-type: disc;
+  padding-left: 20px;
+  margin: 5px 0 0 0;
+}
+
+.sources a {
+  color: #0056b3; /* 濃い青色 */
+  text-decoration: underline;
+}
+
+.sources a:hover {
+  color: #003d80; /* ホバー時さらに濃い青色 */
+}
+
+.disclaimer-text {
+  font-size: 0.75rem; /* 12px */
+  color: #6b7280; /* やや薄いグレー */
+  text-align: center;
+  padding: 8px 10px 4px 10px;
+  margin: 0;
+}
+
+.disclaimer-text a {
+  color: #0056b3; /* リンクの色を少し濃くする */
+  text-decoration: underline; /* 下線を引く */
+  font-weight: bold; /* 少し太字にする */
+}
+
+.disclaimer-text a:hover {
+  opacity: 0.8; /* マウスを乗せたときに少し薄くする */
+}

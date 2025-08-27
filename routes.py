@@ -1,88 +1,117 @@
 from flask import Blueprint, request, jsonify
-from utils import fetch_page_headings, fetch_section_content, load_existing_data
-from openai_api import chat_with_openai  # 追加
+from utils import load_existing_data # 既存の関数を流用
+from openai_api import chat_with_openai
+from janome.tokenizer import Tokenizer
 
+api = Blueprint("api", __name__)
 
-api = Blueprint("api", __name__)  # `api` という Blueprint を作成
+# --- 簡易的なキーワード検索機能 ---
+def search_content(question):
+    all_pages = load_existing_data("site_content.json")
+    if not all_pages:
+        return []
 
-# **製品情報を取得**
-@api.route("/get_product_info", methods=["POST"])
-def get_product_info():
-    data = request.get_json()
-    product_name = data.get("product_name")
+    t = Tokenizer()
+    keywords = []
+    for token in t.tokenize(question):
+        part_of_speech = token.part_of_speech.split(',')[0]
+        if part_of_speech == '名詞':
+            keywords.append(token.surface)
+    
+    if not keywords:
+        keywords = [question]
+    
+    print(f"抽出されたキーワード: {keywords}")
 
-    if not product_name:
-        return jsonify({"bot_response": "製品名が指定されていません。"})
+    scored_pages = []
+    for page in all_pages:
+        score = 0
+        # ★★★ 新しいスコアリングロジック ★★★
+        for keyword in keywords:
+            # 1. タイトルに含まれていたら、非常に高い点数を加算
+            if keyword.lower() in page['title'].lower():
+                score += 10
+            
+            # 2. 本文に含まれている回数も点数として加算
+            score += page['content'].lower().count(keyword.lower())
 
-    # `fixed_page_titles.json` から該当する製品ページのURLを探す
-    page_data = load_existing_data("fixed_page_titles.json")
-    matched_pages = [entry for entry in page_data if entry["title"] == product_name]
+        if score > 0:
+            scored_pages.append({"score": score, "page": page})
 
-    if not matched_pages:
-        return jsonify({"bot_response": "該当する製品ページが見つかりませんでした。"})
-
-    selected_page = matched_pages[0]
-    page_url = selected_page["url"]
-
-    # ページの `h2`, `h3` 見出しを取得
-    headings = fetch_page_headings(page_url)
-
-    return jsonify({
-        "bot_response": f"「{product_name}」についてですね！<br>ご質問はなんですか？",
-        "choices": headings,
-        "source_url": page_url
-    })
-
-# **見出しに対する詳細情報を取得**
-@api.route("/get_answer", methods=["POST"])
-def get_answer():
+    scored_pages.sort(key=lambda x: x['score'], reverse=True)
+    
+    # ★★★ ユーザーに見せるために、上位3件のページを返すように変更 ★★★
+    return [item['page'] for item in scored_pages[:3]]
+# --- 新しいAPIエンドポイント ---
+@api.route("/ask", methods=["POST"])
+def ask():
     data = request.json
-    url = data.get("url")
-    TRUSTED_DOMAIN = "https://fujiwarasangyo.jp/"
-    heading = data.get("heading")
     question = data.get("question")
 
-    if not url or not heading or not question:
-        return jsonify({"error": "無効なリクエスト"}), 400
-    
-    if not url or not url.startswith(TRUSTED_DOMAIN):
-        return jsonify({"error": "無効なURLです"}), 400
-
-    # 指定された見出し以下のコンテンツを取得
-    section_content = fetch_section_content(url, heading)
-    print("🔹 取得したコンテンツ:", section_content)
-
-    # プロンプトに「不足時」の条件を明示する
-    prompt = (
-        f"以下は製品の情報の一部です:\n{section_content}\n\n"
-        f"ユーザーの質問: {question}\n\n"
-        "上記の情報を踏まえて、適切な回答を生成してください。"
-        "もし、質問に必要な情報が上記に含まれていない場合は、"
-        "『申し訳ありません、私ではお答えできない質問のため、以下よりお問い合わせください。』と回答してください。"
-    )
-
-    answer = chat_with_openai(prompt)
-    print("🔹 ChatGPT からの回答:", answer)
-
-    # fallback_message が回答に含まれている場合はお問い合わせを促す
-    fallback_message = "申し訳ありません、私ではお答えできない質問のため、以下よりお問い合わせください。"
-    if fallback_message in answer:
-        return jsonify({"bot_response": fallback_message, "show_contact": True})
-    else:
-        return jsonify({"bot_response": answer})
-
-# **ユーザーの質問に対して応答を生成**
-@api.route("/chat", methods=["POST"])
-def chat():
-    data = request.json
-    user_input = data.get("user_input")
-
-    print("🔹 ユーザーからの質問:", user_input)  # デバッグ用
-
-    if not user_input:
+    if not question:
         return jsonify({"error": "質問が空です"}), 400
 
-    # ここで適切なレスポンスを生成する（仮の応答）
-    response_text = f"あなたの質問: {user_input} に関する情報です。"
+    # 1. 最も関連性の高いページを1つだけ取得
+    relevant_pages = search_content(question)
 
-    return jsonify({"bot_response": response_text})
+    if not relevant_pages:
+        return jsonify({"bot_response": "申し訳ありません、関連する情報が見つかりませんでした。"})
+    
+    # ★★★ AIに渡すのは「最初の1ページだけ」に絞る ★★★
+    main_page = relevant_pages[0]
+
+    # 2. AIに渡す参考ページは、最も関連性の高い最初の1ページに限定
+    main_page = relevant_pages[0]
+
+    # 3. AIに渡すコンテキストを「main_page」からのみ作成
+    context = ""
+    t = Tokenizer()
+    keywords = [token.surface for token in t.tokenize(question) if token.part_of_speech.split(',')[0] == '名詞']
+    if not keywords:
+        keywords = question.split()
+
+    full_content = main_page['content']
+    best_pos = -1
+    for keyword in keywords:
+        pos = full_content.lower().find(keyword.lower())
+        if pos != -1:
+            best_pos = pos
+            break
+    
+    snippet = ""
+    if best_pos != -1:
+        start_index = max(0, best_pos - 750)
+        end_index = start_index + 1500
+        snippet = full_content[start_index:end_index]
+    else:
+        snippet = full_content[:1500]
+
+    context += f"--- ページタイトル: {main_page['title']} ---\n"
+    context += f"{snippet}\n\n"
+
+    # 4. ユーザーに見せるソース情報は、見つかった全ページ（最大3件）から作成
+    sources_data = []
+    for page in relevant_pages:
+        sources_data.append({
+            "title": page['title'],
+            "url": page['url']
+        })
+
+    # 5. AIへのプロンプトを作成
+    prompt = (
+        "あなたは藤原産業株式会社の優秀なアシスタントです。\n"
+        "以下の参考情報に基づいて、ユーザーからの質問に日本語で回答してください。\n"
+        "参考情報に答えがない場合は、無理に回答を生成せず「情報が見つかりませんでした」と答えてください。\n\n"
+        "--- 参考情報 ---\n"
+        f"{context}"
+        "--- ユーザーの質問 ---\n"
+        f"{question}"
+    )
+
+    # 6. AIに質問して回答を取得
+    answer = chat_with_openai(prompt)
+
+    return jsonify({
+        "bot_response": answer,
+        "sources": sources_data
+    })

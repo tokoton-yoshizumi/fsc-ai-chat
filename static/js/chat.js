@@ -1,348 +1,204 @@
 document.addEventListener("DOMContentLoaded", () => {
-  addMessageWithIcon(
+  // 最初のメッセージを表示
+  addMessage(
     "こんにちは🌟 FSC AIです！😊<br>ご希望のサポートをお選びください✨",
     "FSC AI",
-    "sent",
     true
   );
+  // 最初の選択肢ボタンを表示
   showInitialChoices();
+  // フォームの送信イベントを監視
   document
     .getElementById("chat-form")
-    .addEventListener("submit", processUserInput);
+    .addEventListener("submit", handleFormSubmit);
 });
 
-// チャットをリセットして初期状態に戻す関数
+// チャットをリセットする関数
 function resetChat() {
   const messageContainer = document.querySelector(".chat-messages");
-  messageContainer.innerHTML = ""; // 全メッセージクリア
-  addMessageWithIcon(
+  messageContainer.innerHTML = ""; // メッセージを全消去
+  addMessage(
     "こんにちは🌟 FSC AIです！😊<br>ご希望のサポートをお選びください✨",
     "FSC AI",
-    "sent",
     true
   );
   showInitialChoices();
+  // 入力欄を有効化し、プレースホルダーを元に戻す
+  const userInputElement = document.getElementById("user_input");
+  userInputElement.placeholder = "メッセージを入力...";
+  userInputElement.disabled = false;
 }
 
-// **起動時の選択肢を表示**
+// 1. 最初の選択肢ボタンを表示する関数
 function showInitialChoices() {
-  const messageContainer = document.querySelector(".chat-messages");
-  const choiceContainer = document.createElement("div");
-  choiceContainer.classList.add("choices");
-
   const choices = [
-    { text: "📦 製品について", action: askForProductName },
-    { text: "🛍️ 製品のご注文", action: askOrderOptions },
-    { text: "🛠️ 校正・修理のご依頼", action: askCalibrationRepair },
-    { text: "📩 お問い合わせ", action: askContactForm },
+    { text: "📦 製品について", action: switchToFreeTextMode }, // ★ここを変更
+    {
+      text: "🛍️ 製品のご注文",
+      action: () =>
+        showLinkMessage(
+          "ご注文はこちらのページからどうぞ🛒",
+          "https://fujiwarasangyo.jp/order/"
+        ),
+    },
+    {
+      text: "🛠️ 校正・修理のご依頼",
+      action: () =>
+        showLinkMessage(
+          "校正・修理のご依頼はこちらからどうぞ🔧",
+          "https://fujiwarasangyo.jp/calibratio-repair/"
+        ),
+    },
+    {
+      text: "📩 お問い合わせ",
+      action: () =>
+        showLinkMessage(
+          "お問い合わせはこちらのフォームをご利用ください📩",
+          "https://fujiwarasangyo.jp/form-contact/"
+        ),
+    },
   ];
 
-  choices.forEach((choice) => {
-    const button = document.createElement("button");
-    button.textContent = choice.text;
-    button.classList.add("choice-button");
-    button.onclick = () => {
-      addMessageWithIcon(choice.text, "ユーザー", "received", false);
-      choice.action();
-    };
-    choiceContainer.appendChild(button);
-  });
-
-  messageContainer.appendChild(choiceContainer);
-  messageContainer.scrollTop = messageContainer.scrollHeight;
+  const choiceContainer = createChoiceButtons(choices);
+  document.querySelector(".chat-messages").appendChild(choiceContainer);
+  scrollToBottom();
 }
 
-// **「📦 製品について」→ フォームのプレースホルダーを変更**
-function askForProductName() {
-  addMessageWithIcon(
-    "どの製品について知りたいですか？🔍<br>製品名を入力してください💬😊",
+// 2. 「製品について」が押されたときに、自由入力モードに切り替える新しい関数
+function switchToFreeTextMode() {
+  addMessage(
+    "製品についてですね！<br>どのようなことに関心がありますか？ご自由に質問を入力してください✍️",
     "FSC AI",
-    "sent",
     true
   );
 
+  // 入力欄のプレースホルダーを変更して、ユーザー入力を促す
   const userInputElement = document.getElementById("user_input");
-  userInputElement.placeholder = "製品名を入力してください";
-  userInputElement.dataset.inputType = "product"; // 製品モードを判別
+  userInputElement.placeholder = "製品に関するご質問を入力...";
+  userInputElement.focus(); // 入力欄にフォーカスを当てる
 }
 
-// **「🛍️ ご注文」→ ご注文の選択肢を表示**
-function askOrderOptions() {
-  addMessageWithIcon("ご注文内容を選択してください🛒", "FSC AI", "sent", true);
-  const messageContainer = document.querySelector(".chat-messages");
-  const choiceContainer = document.createElement("div");
-  choiceContainer.classList.add("choices");
-
-  const choices = [
-    { text: "購入商品のご注文", link: "https://fujiwarasangyo.jp/order/" },
-    {
-      text: "一般商品のレンタル",
-      link: "https://fujiwarasangyo.jp/form-rental/",
-    },
-    {
-      text: "ロックボルト試験器具関連のレンタル",
-      link: "https://fujiwarasangyo.jp/rockbolt-form/",
-    },
-  ];
-
-  choices.forEach((choice) => {
-    const button = document.createElement("button");
-    button.textContent = choice.text;
-    button.classList.add("choice-button");
-    button.onclick = () => {
-      addMessageWithIcon(choice.text, "ユーザー", "received", false);
-      showLinkMessage("こちらのリンクをご確認ください👇", choice.link);
-    };
-    choiceContainer.appendChild(button);
-  });
-
-  messageContainer.appendChild(choiceContainer);
-  messageContainer.scrollTop = messageContainer.scrollHeight;
-}
-
-// **「🛠️ 校正・修理」→ 校正・修理のリンクを案内**
-function askCalibrationRepair() {
-  showLinkMessage(
-    "校正・修理のご依頼はこちらのフォームからどうぞ🔧",
-    "https://fujiwarasangyo.jp/calibratio-repair/"
-  );
-}
-
-// **「📩 お問い合わせ」→ お問い合わせフォームのリンクを案内**
-function askContactForm() {
-  showLinkMessage(
-    "お問い合わせはこちらのフォームをご利用ください📩",
-    "https://fujiwarasangyo.jp/form-contact/"
-  );
-}
-
-// ユーザーにリンクを案内するメッセージを表示する共通関数（ボタン表示版）
-function showLinkMessage(message, link) {
-  const content =
-    message +
-    `<br><button class="link-button" onclick="window.open('${link}', '_blank')">リンクへ移動</button>`;
-  addMessageWithIcon(content, "FSC AI", "sent", true);
-}
-
-// **製品名送信後、見出しリストを取得**
-async function processUserInput(event) {
+// 3. フォームが送信されたときのメインの処理
+async function handleFormSubmit(event) {
   event.preventDefault();
-
   const userInputElement = document.getElementById("user_input");
   const userInput = userInputElement.value.trim();
 
   if (!userInput) return;
 
-  addMessageWithIcon(userInput, "ユーザー", "received", false);
-
-  if (userInputElement.dataset.inputType === "product") {
-    // 製品名入力のとき
-    try {
-      showLoadingMessage(); // 🔥 ローディング出す
-
-      const response = await fetch("/get_product_info", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ product_name: userInput }),
-      });
-
-      const data = await response.json();
-
-      removeLoadingMessage(); // 🔥 ローディング消す
-
-      if (data.choices && data.choices.length > 0) {
-        addMessageWithIcon(
-          `「${userInput}」についてですね！😊\n知りたい項目を選んでください✨`,
-          "FSC AI",
-          "sent",
-          true
-        );
-
-        showSubChoices(
-          data.choices,
-          "以下の見出しから選んでください🔽",
-          data.source_url
-        );
-      } else {
-        addMessageWithIcon(
-          "該当する製品ページが見つかりませんでした😢",
-          "FSC AI",
-          "sent",
-          true
-        );
-      }
-    } catch (error) {
-      console.error("Error fetching product info:", error);
-      removeLoadingMessage();
-      addMessageWithIcon(
-        "エラーが発生しました😓。もう一度お試しください。",
-        "FSC AI",
-        "sent",
-        true
-      );
-    }
-  } else if (userInputElement.dataset.inputType === "question") {
-    // 見出しを選んだ後の質問入力のとき
-    try {
-      showLoadingMessage(); // 🔥 ローディング出す
-
-      const response = await fetch("/get_answer", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          url: userInputElement.dataset.url,
-          heading: userInputElement.dataset.heading,
-          question: userInput,
-        }),
-      });
-
-      const data = await response.json();
-
-      removeLoadingMessage(); // 🔥 ローディング消す
-      addMessageWithIcon(data.bot_response, "FSC AI", "sent", true, true);
-
-      if (data.show_contact) {
-        askContactOptions();
-      }
-    } catch (error) {
-      console.error("❌ fetchエラー:", error);
-      removeLoadingMessage();
-      addMessageWithIcon(
-        "エラーが発生しました😓。もう一度お試しください。",
-        "FSC AI",
-        "sent",
-        true
-      );
-    }
-  }
-
+  addMessage(userInput, "ユーザー", false);
   userInputElement.value = "";
+
+  try {
+    showLoadingMessage();
+
+    const response = await fetch("/ask", {
+      // 修正済みの /ask APIを呼び出す
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question: userInput }),
+    });
+
+    const data = await response.json();
+    removeLoadingMessage();
+
+    let botResponseHTML = data.bot_response.replace(/\n/g, "<br>"); // 改行を<br>に変換
+
+    // 回答のソース元リンクがあれば表示
+    if (data.sources && data.sources.length > 0) {
+      botResponseHTML += '<div class="sources">関連ページ:<ul>';
+      data.sources.forEach((source) => {
+        // URLの代わりにタイトルを表示し、URLをリンク先にする
+        botResponseHTML += `<li><a href="${source.url}" target="_blank" rel="noopener noreferrer">${source.title}</a></li>`;
+      });
+      botResponseHTML += "</ul></div>";
+    }
+
+    addMessage(botResponseHTML, "FSC AI", true);
+  } catch (error) {
+    console.error("Error:", error);
+    removeLoadingMessage();
+    addMessage(
+      "エラーが発生しました。もう一度お試しください。",
+      "FSC AI",
+      true
+    );
+  }
 }
 
-// **h2 を選択した後、質問入力モードにする**
-function handleHeadingSelection(url, heading) {
-  console.log("🔹 選択された見出し:", heading);
-  addMessageWithIcon(
-    `「${heading}」について知りたい😃`,
-    "ユーザー",
-    "received",
-    false
-  );
+// --- 以下はメッセージ表示などの補助的な関数群です ---
 
-  const userInputElement = document.getElementById("user_input");
-  userInputElement.placeholder = `「${heading}」について質問を入力✍️`;
-  userInputElement.dataset.inputType = "question";
-  userInputElement.dataset.url = url;
-  userInputElement.dataset.heading = heading;
-
-  addMessageWithIcon(
-    `「${heading}」についてですね！💡\nどのようなご質問がありますか？🤔`,
-    "FSC AI",
-    "sent",
-    true
-  );
-}
-
-// **選択肢を表示する汎用関数**
-function showSubChoices(choices, promptText, url) {
-  addMessageWithIcon(promptText, "FSC AI", "sent", true);
-
-  const messageContainer = document.querySelector(".chat-messages");
-  const choiceContainer = document.createElement("div");
-  choiceContainer.classList.add("choices");
+// 選択肢ボタンを生成する補助関数
+function createChoiceButtons(choices) {
+  const container = document.createElement("div");
+  container.classList.add("choices");
 
   choices.forEach((choice) => {
     const button = document.createElement("button");
-    button.textContent = choice;
+    button.innerHTML = choice.text;
     button.classList.add("choice-button");
-
     button.onclick = () => {
-      console.log("ボタンがクリックされました:", choice);
-      handleHeadingSelection(url, choice);
+      addMessage(button.innerText, "ユーザー", false); // ユーザーがボタンを押したことを表示
+      choice.action();
+      // 押されたボタンは再度押せないように非表示にする
+      container.style.display = "none";
     };
-
-    choiceContainer.appendChild(button);
+    container.appendChild(button);
   });
-
-  messageContainer.appendChild(choiceContainer);
-  messageContainer.scrollTop = messageContainer.scrollHeight;
+  return container;
 }
 
-// **フォームの送信イベントを監視**
-document
-  .getElementById("chat-form")
-  .addEventListener("submit", processUserInput);
+// リンク付きのメッセージを表示する補助関数
+function showLinkMessage(message, link) {
+  const content =
+    message +
+    `<br><button class="link-button" onclick="window.open('${link}', '_blank')">リンクへ移動</button>`;
+  addMessage(content, "FSC AI", true);
+}
 
-// **メッセージを追加する関数（AI のみアイコン付き）**
-function addMessageWithIcon(
-  content,
-  sender,
-  className,
-  isAI,
-  showOperatorButton = false
-) {
+// メッセージをチャット欄に追加する汎用関数
+function addMessage(content, sender, isAI) {
   const messageContainer = document.querySelector(".chat-messages");
-  const message = document.createElement("div");
-  message.classList.add("message", className);
+  const messageDiv = document.createElement("div");
+  messageDiv.classList.add("message", isAI ? "sent" : "received");
 
+  let innerHTML = "";
   if (isAI) {
-    const icon = document.createElement("img");
-    icon.src = "/static/images/icon.png";
-    icon.classList.add("message-icon");
-    message.appendChild(icon);
+    innerHTML += `<img src="/static/images/icon.png" class="message-icon" alt="AI Icon">`;
   }
+  innerHTML += `<div class="message-text"><p>${content}</p><p class="time">${sender}</p></div>`;
 
-  const textWrapper = document.createElement("div");
-  textWrapper.classList.add("message-text");
-
-  let innerHTML = `<p>${content}</p>`;
-
-  if (showOperatorButton) {
-    innerHTML += `
-      <div style="margin-top: 10px;">
-        <button class="operator-button choice-button" onclick="redirectToContact()">📩お問い合わせはこちら</button>
-      </div>
-    `;
-  }
-
-  innerHTML += `<p class="time">${sender}</p>`;
-
-  textWrapper.innerHTML = innerHTML;
-  message.appendChild(textWrapper);
-  messageContainer.appendChild(message);
-
-  messageContainer.scrollTop = messageContainer.scrollHeight;
+  messageDiv.innerHTML = innerHTML;
+  messageContainer.appendChild(messageDiv);
+  scrollToBottom();
 }
 
-let loadingMessage = null; // グローバルにローディングメッセージを保持
-
+// ローディング表示関連
+let loadingMessageElement = null;
 function showLoadingMessage() {
   const messageContainer = document.querySelector(".chat-messages");
-  loadingMessage = document.createElement("div");
-  loadingMessage.classList.add("message", "sent");
-
-  const icon = document.createElement("img");
-  icon.src = "/static/images/icon.png";
-  icon.classList.add("message-icon");
-  loadingMessage.appendChild(icon);
-
-  const textWrapper = document.createElement("div");
-  textWrapper.classList.add("message-text");
-  textWrapper.innerHTML = `<p>🧠 回答を考えています...</p><p class="time">FSC AI</p>`;
-
-  loadingMessage.appendChild(textWrapper);
-  messageContainer.appendChild(loadingMessage);
-
-  messageContainer.scrollTop = messageContainer.scrollHeight;
+  loadingMessageElement = document.createElement("div");
+  loadingMessageElement.classList.add("message", "sent");
+  loadingMessageElement.innerHTML = `
+        <img src="/static/images/icon.png" class="message-icon" alt="AI Icon">
+        <div class="message-text">
+            <p>🧠 回答を考えています...</p>
+            <p class="time">FSC AI</p>
+        </div>
+    `;
+  messageContainer.appendChild(loadingMessageElement);
+  scrollToBottom();
 }
 
 function removeLoadingMessage() {
-  if (loadingMessage) {
-    loadingMessage.remove();
-    loadingMessage = null;
+  if (loadingMessageElement) {
+    loadingMessageElement.remove();
+    loadingMessageElement = null;
   }
 }
 
-function redirectToContact() {
-  window.open("https://fujiwarasangyo.jp/form-contact/", "_blank");
+// 自動で最下部にスクロールする関数
+function scrollToBottom() {
+  const container = document.querySelector(".chat-messages");
+  container.scrollTop = container.scrollHeight;
 }
