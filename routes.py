@@ -6,25 +6,36 @@ from janome.tokenizer import Tokenizer
 
 api = Blueprint("api", __name__)
 
-t = Tokenizer()
+ALL_PAGES_DATA = None
+t = None
 
-print("🔄 サイトのコンテンツデータを読み込んでいます...")
-ALL_PAGES_DATA = load_existing_data("site_content.json")
-if ALL_PAGES_DATA:
-    print(f"✅ 全{len(ALL_PAGES_DATA)}ページのデータをメモリに読み込みました。")
-else:
-    print("⚠️ コンテンツデータが見つからないか、空です。")
+def initialize_data():
+    global ALL_PAGES_DATA, t
+    if ALL_PAGES_DATA is None:
+        print("🔄 初回リクエスト：サイトのコンテンツデータを読み込んでいます...")
+        ALL_PAGES_DATA = load_existing_data("site_content.json")
+        if ALL_PAGES_DATA:
+            print(f"✅ 全{len(ALL_PAGES_DATA)}ページのデータをメモリに読み込みました。")
+        else:
+            print("⚠️ コンテンツデータが見つからないか、空です。")
+    
+    if t is None:
+        print("🔄 初回リクエスト：Janome Tokenizerを初期化しています...")
+        t = Tokenizer()
+        print("✅ Tokenizerの初期化が完了しました。")
 
 SYNONYM_MAP = {
     "重さ": "重量", "値段": "価格", "金額": "価格", "費用": "価格",
     "大きさ": "寸法", "サイズ": "寸法", "長さ": "全長", "高さ": "全長",
     "耐荷重": "最大荷重", "出力": "最大荷重", "能力": "最大荷重",
     "穴径": "ホール径", "伸び": "ストローク", "オイル量": "油量",
-    "オイル容量": "油量", "タンク容量": "有効油量", "流量": "吐出量",
-    "いつ届く": "発送", "納期": "発送",
+    "オイル容量": "油量", "タンク容量": "有効油量", "流量": "吐出量", "いつ届く": "発送", "納期": "発送",
 }
 
 def search_content(question):
+
+    initialize_data()
+    
     all_pages = ALL_PAGES_DATA
     if not all_pages:
         return [], []
@@ -55,8 +66,10 @@ def search_content(question):
 
         for keyword in keywords:
             kw_lower = keyword.lower()
+            # ▼▼▼【ここを修正】タイトル一致のスコアを大幅にアップ ▼▼▼
             if kw_lower in page_title_lower:
                 score += 100
+            # ▲▲▲【ここまで修正】▲▲▲
             score += page_content_lower.count(kw_lower)
             
         if score > 0:
@@ -111,6 +124,13 @@ def ask():
             f"{question_for_ai}"
         )
 
+        print("\n" + "="*50)
+        print("AIへの問い合わせ内容（1回目）")
+        print(f"参照ページ: {main_page['title']}")
+        print(f"AIに渡すコンテキスト（抜粋）:\n{best_snippet[:300]}...")
+        print(f"AIに渡す質問文: {question_for_ai}")
+        print("="*50 + "\n")
+
         answer1 = chat_with_openai(prompt1)
 
         if "情報なし" not in answer1:
@@ -123,7 +143,7 @@ def ask():
     
     caution_message = (
         '<div class="disclaimer-ai">'
-        "申し訳ありませんが、ご質問に関する情報は見つかりませんでした。<br>"
+        "申し訳ありませんが、ご質問に関する情報は見つかりませんでした。<br><br>"
         "<b>⚠️ご注意ください⚠️</b><br>"
         "以下の回答は、AIが持つ一般的な知識や公開されている情報に基づいた参考内容です。<br>"
         "そのため、藤原産業の公式な仕様・データではありません。<br>"
@@ -131,7 +151,6 @@ def ask():
         '</div>'
     )
 
-    # ▼▼▼【ここを修正】AIへの指示をより明確にしました ▼▼▼
     prompt2 = (
         "あなたは、親切で優秀なAIアシスタントです。\n"
         "藤原産業株式会社のウェブサイト内では、以下の質問に関する情報が見つかりませんでした。\n"
@@ -142,7 +161,6 @@ def ask():
         "--- ユーザーの質問 ---\n"
         f"{question}"
     )
-    # ▲▲▲【ここまで修正】▲▲▲
     
     answer2 = chat_with_openai(prompt2)
 
