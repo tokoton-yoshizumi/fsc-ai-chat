@@ -210,3 +210,13 @@ button.reset-button:hover {
 .disclaimer-text a:hover {
   opacity: 0.8; /* マウスを乗せたときに少し薄くする */
 }
+
+/* AIの注意書き専用のスタイル */
+.disclaimer-ai {
+  font-size: 0.85rem; /* 少し小さめの文字 */
+  color: #4a5568; /* 落ち着いたグレー系の色 */
+  background-color: #f7fafc; /* 薄い背景色 */
+  border: 1px solid #e2e8f0;
+  padding: 12px;
+  border-radius: 8px;
+}
