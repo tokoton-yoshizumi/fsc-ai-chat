@@ -20,6 +20,36 @@ def search_content(question):
 
     question_cleaned = re.sub(r'[^\w\s\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]', '', question)
 
+    # ▼▼▼【改善版】類義語辞書 ▼▼▼
+    synonym_map = {
+        # 一般的な言葉
+        "重さ": "重量",
+        "値段": "価格",
+        "金額": "価格",
+        "費用": "価格",
+        "大きさ": "寸法",
+        "サイズ": "寸法",
+        "長さ": "全長",
+        "高さ": "全長",
+
+        # 製品スペック関連
+        "耐荷重": "最大荷重",
+        "出力": "最大荷重",
+        "能力": "最大荷重",
+        "穴径": "ホール径",
+        "伸び": "ストローク",
+        "オイル量": "油量",
+        "オイル容量": "油量",
+        "タンク容量": "有効油量",
+        "流量": "吐出量",
+        "圧": "圧力",
+
+        # 配送・納期関連
+        "いつ届く": "発送",
+        "納期": "発送",
+    }
+    # ▲▲▲【ここまで】▲▲▲
+
     stop_words = [
         "の", "に", "は", "を", "た", "が", "で", "て", "と", "し", "れ", "さ", "ある", "いる", "も", "する", "から", "な", "へ", "より", "です", "ます", "でした", "ました",
         "こと", "もの", "これ", "それ", "あれ", "どれ", "この", "その", "あの", "どの", "ここ", "そこ", "あそこ", "どこ",
@@ -31,12 +61,19 @@ def search_content(question):
     for word in stop_words:
         temp_question = temp_question.replace(word, " ")
 
-    keywords = [kw for kw in temp_question.split() if kw]
+    keywords_raw = [kw for kw in temp_question.split() if kw]
+    
+    # ▼▼▼【ここから修正】類義語を変換する処理を追加 ▼▼▼
+    keywords = []
+    for kw in keywords_raw:
+        # 辞書に類義語があれば変換し、なければ元の単語を使用
+        keywords.append(synonym_map.get(kw, kw))
+    # ▲▲▲【ここまで修正】▲▲▲
 
     if not keywords:
         keywords = [question_cleaned]
     
-    print(f"抽出されたキーワード: {keywords}")
+    print(f"抽出されたキーワード（類義語変換後）: {keywords}")
 
     scored_pages = []
     for page in all_pages:
@@ -106,7 +143,6 @@ def ask():
 
     print("⚠️ HP内に情報が見つからなかったため、GPTの一般知識で回答します。")
     
-    # ▼▼▼【ここを修正しました】クライアント指定の注意書きに変更 ▼▼▼
     caution_message = (
         "申し訳ありませんが、ご質問に関する情報は見つかりませんでした。\n"
         "⚠️ご注意ください⚠️\n"
