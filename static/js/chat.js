@@ -178,7 +178,7 @@ let loadingMessageElement = null;
 function showLoadingMessage() {
   const messageContainer = document.querySelector(".chat-messages");
   loadingMessageElement = document.createElement("div");
-  loadingMessageElement.classList.add("message", "sent");
+  loadingMessageElement.classList.add("message", "received");
   loadingMessageElement.innerHTML = `
         <img src="/static/images/icon.png" class="message-icon" alt="AI Icon">
         <div class="message-text">
