@@ -160,7 +160,7 @@ function showLinkMessage(message, link) {
 function addMessage(content, sender, isAI) {
   const messageContainer = document.querySelector(".chat-messages");
   const messageDiv = document.createElement("div");
-  messageDiv.classList.add("message", isAI ? "sent" : "received");
+  messageDiv.classList.add("message", isAI ? "received" : "sent");
 
   let innerHTML = "";
   if (isAI) {

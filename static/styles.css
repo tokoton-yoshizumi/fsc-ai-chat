@@ -54,11 +54,13 @@ p {
   word-wrap: break-word;
 }
 
+/* 右側に表示されるメッセージ（自分）のスタイル */
 .sent {
-  background-color: #dcf8c6;
+  background-color: #dcf8c6; /* 明るい緑色 */
   margin-left: auto;
 }
 
+/* 左側に表示されるメッセージ（AI）のスタイル */
 .received {
   background-color: white;
   margin-right: auto;
