@@ -8,12 +8,23 @@ api = Blueprint("api", __name__)
 
 t = Tokenizer()
 
-print("🔄 サイトのコンテンツデータを読み込んでいます...")
-ALL_PAGES_DATA = load_existing_data("site_content.json")
-if ALL_PAGES_DATA:
-    print(f"✅ 全{len(ALL_PAGES_DATA)}ページのデータをメモリに読み込みました。")
-else:
-    print("⚠️ コンテンツデータが見つからないか、空です。")
+ALL_PAGES_DATA = None
+t = None
+
+def initialize_data():
+    global ALL_PAGES_DATA, t
+    if ALL_PAGES_DATA is None:
+        print("🔄 初回リクエスト：サイトのコンテンツデータを読み込んでいます...")
+        ALL_PAGES_DATA = load_existing_data("site_content.json")
+        if ALL_PAGES_DATA:
+            print(f"✅ 全{len(ALL_PAGES_DATA)}ページのデータをメモリに読み込みました。")
+        else:
+            print("⚠️ コンテンツデータが見つからないか、空です。")
+    
+    if t is None:
+        print("🔄 初回リクエスト：Janome Tokenizerを初期化しています...")
+        t = Tokenizer()
+        print("✅ Tokenizerの初期化が完了しました。")
 
 SYNONYM_MAP = {
     "重さ": "重量", "値段": "価格", "金額": "価格", "費用": "価格",
