@@ -2,15 +2,14 @@ from flask import Blueprint, request, jsonify
 from utils import load_existing_data
 from openai_api import chat_with_openai
 import re
-from janome.tokenizer import Tokenizer
 
 api = Blueprint("api", __name__)
 
+# janomeの初期化を削除
 ALL_PAGES_DATA = None
-t = None
 
 def initialize_data():
-    global ALL_PAGES_DATA, t
+    global ALL_PAGES_DATA
     if ALL_PAGES_DATA is None:
         print("🔄 初回リクエスト：サイトのコンテンツデータを読み込んでいます...")
         ALL_PAGES_DATA = load_existing_data("site_content.json")
@@ -18,11 +17,6 @@ def initialize_data():
             print(f"✅ 全{len(ALL_PAGES_DATA)}ページのデータをメモリに読み込みました。")
         else:
             print("⚠️ コンテンツデータが見つからないか、空です。")
-    
-    if t is None:
-        print("🔄 初回リクエスト：Janome Tokenizerを初期化しています...")
-        t = Tokenizer()
-        print("✅ Tokenizerの初期化が完了しました。")
 
 SYNONYM_MAP = {
     "重さ": "重量", "値段": "価格", "金額": "価格", "費用": "価格",
@@ -32,32 +26,40 @@ SYNONYM_MAP = {
     "オイル容量": "油量", "タンク容量": "有効油量", "流量": "吐出量", "いつ届く": "発送", "納期": "発送",
 }
 
+# --- janomeを使わないキーワード検索機能 ---
 def search_content(question):
-
     initialize_data()
     
     all_pages = ALL_PAGES_DATA
     if not all_pages:
         return [], []
 
+    # 1. 質問文から記号を削除
     question_cleaned = re.sub(r'[。「」、？！（）『』【】・]', ' ', question)
     
+    # 2. 類義語を置換
     question_synonymized = question_cleaned
     for key, value in SYNONYM_MAP.items():
         question_synonymized = question_synonymized.replace(key, value)
     
-    tokens = t.tokenize(question_synonymized)
-    keywords = []
-    for token in tokens:
-        part_of_speech = token.part_of_speech.split(',')[0]
-        if part_of_speech == '名詞':
-            keywords.append(token.surface)
-    
+    # 3. ストップワードを定義
+    stop_words = [
+        "の", "に", "は", "を", "た", "が", "で", "て", "と", "し", "れ", "ある", "いる", "も", "する", "から", "な", "へ", "より", "です", "ます", "でした", "ました",
+        "こと", "もの", "これ", "それ", "あれ", "どれ", "この", "その", "あの", "どの", "ここ", "そこ", "あそこ", "どこ",
+        "ください", "よう", "について", "における", "に関して", "対して", "どのくらい", "何", "なぜ", "いつ", "だれ", "どうして", "教えて", "思います", "どう", "いう",
+        "また", "および", "しかし", "そして"
+    ]
+
+    # 4. ストップワードを除去してキーワードを抽出
+    words = question_synonymized.split()
+    keywords = [word for word in words if word not in stop_words]
+
     if not keywords:
-        keywords = [question_cleaned]
+        keywords = words if words else [question_synonymized]
     
     print(f"抽出されたキーワード（最終）: {keywords}")
 
+    # 5. ページをスコアリング
     scored_pages = []
     for page in all_pages:
         score = 0
@@ -66,10 +68,8 @@ def search_content(question):
 
         for keyword in keywords:
             kw_lower = keyword.lower()
-            # ▼▼▼【ここを修正】タイトル一致のスコアを大幅にアップ ▼▼▼
             if kw_lower in page_title_lower:
                 score += 100
-            # ▲▲▲【ここまで修正】▲▲▲
             score += page_content_lower.count(kw_lower)
             
         if score > 0:
@@ -124,13 +124,6 @@ def ask():
             f"{question_for_ai}"
         )
 
-        print("\n" + "="*50)
-        print("AIへの問い合わせ内容（1回目）")
-        print(f"参照ページ: {main_page['title']}")
-        print(f"AIに渡すコンテキスト（抜粋）:\n{best_snippet[:300]}...")
-        print(f"AIに渡す質問文: {question_for_ai}")
-        print("="*50 + "\n")
-
         answer1 = chat_with_openai(prompt1)
 
         if "情報なし" not in answer1:
@@ -143,7 +136,7 @@ def ask():
     
     caution_message = (
         '<div class="disclaimer-ai">'
-        "申し訳ありませんが、ご質問に関する情報は見つかりませんでした。<br><br>"
+        "申し訳ありませんが、ご質問に関する情報は見つかりませんでした。<br>"
         "<b>⚠️ご注意ください⚠️</b><br>"
         "以下の回答は、AIが持つ一般的な知識や公開されている情報に基づいた参考内容です。<br>"
         "そのため、藤原産業の公式な仕様・データではありません。<br>"
@@ -155,7 +148,7 @@ def ask():
         "あなたは、親切で優秀なAIアシスタントです。\n"
         "藤原産業株式会社のウェブサイト内では、以下の質問に関する情報が見つかりませんでした。\n"
         "あなたの一般的な知識を元にして、この質問に回答してください。\n"
-        "ただし、回答の一番最初に、以下のHTMLブロック形式の注意書きを**改行などを一切挟まずに**そのまま含めてください。\n"
+        "ただし、回答の一番最初に、以下のHTMLブロック形式の注意書きを改行などを一切挟まずにそのまま含めてください。\n"
         "注意書きのHTMLブロックの直後から、すぐに回答本文を始めてください。\n\n"
         f"{caution_message}\n\n"
         "--- ユーザーの質問 ---\n"
