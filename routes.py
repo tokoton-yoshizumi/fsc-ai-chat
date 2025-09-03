@@ -6,8 +6,6 @@ from janome.tokenizer import Tokenizer
 
 api = Blueprint("api", __name__)
 
-t = Tokenizer()
-
 ALL_PAGES_DATA = None
 t = None
 
@@ -35,6 +33,9 @@ SYNONYM_MAP = {
 }
 
 def search_content(question):
+
+    initialize_data()
+    
     all_pages = ALL_PAGES_DATA
     if not all_pages:
         return [], []
