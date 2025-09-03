@@ -5,7 +5,6 @@ import re
 
 api = Blueprint("api", __name__)
 
-# janomeの初期化を削除
 ALL_PAGES_DATA = None
 
 def initialize_data():
@@ -26,7 +25,6 @@ SYNONYM_MAP = {
     "オイル容量": "油量", "タンク容量": "有効油量", "流量": "吐出量", "いつ届く": "発送", "納期": "発送",
 }
 
-# --- janomeを使わないキーワード検索機能 ---
 def search_content(question):
     initialize_data()
     
@@ -34,15 +32,12 @@ def search_content(question):
     if not all_pages:
         return [], []
 
-    # 1. 質問文から記号を削除
     question_cleaned = re.sub(r'[。「」、？！（）『』【】・]', ' ', question)
     
-    # 2. 類義語を置換
     question_synonymized = question_cleaned
     for key, value in SYNONYM_MAP.items():
         question_synonymized = question_synonymized.replace(key, value)
     
-    # 3. ストップワードを定義
     stop_words = [
         "の", "に", "は", "を", "た", "が", "で", "て", "と", "し", "れ", "ある", "いる", "も", "する", "から", "な", "へ", "より", "です", "ます", "でした", "ました",
         "こと", "もの", "これ", "それ", "あれ", "どれ", "この", "その", "あの", "どの", "ここ", "そこ", "あそこ", "どこ",
@@ -50,16 +45,20 @@ def search_content(question):
         "また", "および", "しかし", "そして"
     ]
 
-    # 4. ストップワードを除去してキーワードを抽出
-    words = question_synonymized.split()
-    keywords = [word for word in words if word not in stop_words]
+    # ▼▼▼【ここを修正】ストップワードをスペースに置き換える ▼▼▼
+    temp_question = question_synonymized
+    for word in stop_words:
+        temp_question = temp_question.replace(word, " ")
+    
+    # スペースで区切ってキーワードリストを作成
+    keywords = [kw for kw in temp_question.split() if kw]
+    # ▲▲▲【ここまで修正】▲▲▲
 
     if not keywords:
-        keywords = words if words else [question_synonymized]
+        keywords = [question_synonymized.strip()]
     
     print(f"抽出されたキーワード（最終）: {keywords}")
 
-    # 5. ページをスコアリング
     scored_pages = []
     for page in all_pages:
         score = 0
@@ -149,8 +148,8 @@ def ask():
         "藤原産業株式会社のウェブサイト内では、以下の質問に関する情報が見つかりませんでした。\n"
         "あなたの一般的な知識を元にして、この質問に回答してください。\n"
         "ただし、回答の一番最初に、以下のHTMLブロック形式の注意書きを改行などを一切挟まずにそのまま含めてください。\n"
-        "注意書きのHTMLブロックの直後から、すぐに回答本文を始めてください。\n\n"
-        f"{caution_message}\n\n"
+        "注意書きのHTMLブロックの直後から、すぐに回答本文を始めてください。"
+        f"{caution_message}"
         "--- ユーザーの質問 ---\n"
         f"{question}"
     )
