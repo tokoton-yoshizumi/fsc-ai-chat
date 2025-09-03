@@ -62,10 +62,8 @@ def ask():
     if not question:
         return jsonify({"error": "質問が空です"}), 400
 
-    # 1. 関連性の高いページとキーワードを取得
     relevant_pages, keywords = search_content(question)
 
-    # 2. HP内に情報が見つかった場合の処理
     if relevant_pages:
         main_page = relevant_pages[0]
         full_content = main_page['content']
@@ -85,10 +83,8 @@ def ask():
             snippet = full_content[:1500]
 
         context = f"--- ページタイトル: {main_page['title']} ---\n{snippet}\n\n"
-
         sources_data = [{"title": page['title'], "url": page['url']} for page in relevant_pages]
 
-        # AIへの最初のプロンプト（HP情報ベース）
         prompt1 = (
             "あなたは藤原産業株式会社の製品について回答する、親切なアシスタントです。\n"
             "以下の参考情報だけを元にして、ユーザーからの質問に日本語で分かりやすく回答してください。\n"
@@ -102,23 +98,29 @@ def ask():
 
         answer1 = chat_with_openai(prompt1)
 
-        # AIがHP情報から回答を生成できた場合
         if "情報なし" not in answer1:
             return jsonify({
                 "bot_response": answer1,
                 "sources": sources_data
             })
 
-    # 3. HP内に情報がなかった場合、またはAIが回答を生成できなかった場合のフォールバック処理
     print("⚠️ HP内に情報が見つからなかったため、GPTの一般知識で回答します。")
     
-    # AIへの2番目のプロンプト（一般知識ベース）
+    # ▼▼▼【ここを修正しました】クライアント指定の注意書きに変更 ▼▼▼
+    caution_message = (
+        "申し訳ありませんが、ご質問に関する情報は見つかりませんでした。\n"
+        "⚠️ ご注意ください⚠️\n"
+        "以下の回答は、AIが持つ一般的な知識や公開されている情報に基づいた参考内容です。\n"
+        "そのため、藤原産業の公式な仕様・データではありません。\n"
+        "実際に使用される際は、必ずカタログ、藤原産業の公式資料をご確認ください。"
+    )
+
     prompt2 = (
         "あなたは、親切で優秀なAIアシスタントです。\n"
         "藤原産業株式会社のウェブサイト内では、以下の質問に関する情報が見つかりませんでした。\n"
         "あなたの一般的な知識を元にして、この質問に回答してください。\n"
         "ただし、回答の一番最初に、以下の注意書きを必ず改行を挟んで含めてください。\n\n"
-        "**※ご注意：** この回答はAIの一般的な知識に基づくもので、藤原産業の公式情報ではありません。参考としてご活用ください。\n\n"
+        f"--- 注意書き ---\n{caution_message}\n\n"
         "--- ユーザーの質問 ---\n"
         f"{question}"
     )
@@ -127,5 +129,5 @@ def ask():
 
     return jsonify({
         "bot_response": answer2,
-        "sources": []  # 一般知識からの回答なのでソースはなし
+        "sources": []
     })
