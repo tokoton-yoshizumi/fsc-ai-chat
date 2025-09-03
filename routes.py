@@ -12,6 +12,16 @@ if ALL_PAGES_DATA:
 else:
     print("⚠️ コンテンツデータが見つからないか、空です。")
 
+# --- 類義語辞書を関数の外で定義 ---
+SYNONYM_MAP = {
+    "重さ": "重量", "値段": "価格", "金額": "価格", "費用": "価格",
+    "大きさ": "寸法", "サイズ": "寸法", "長さ": "全長", "高さ": "全長",
+    "耐荷重": "最大荷重", "出力": "最大荷重", "能力": "最大荷重",
+    "穴径": "ホール径", "伸び": "ストローク", "オイル量": "油量",
+    "オイル容量": "油量", "タンク容量": "有効油量", "流量": "吐出量",
+    "圧": "圧力", "いつ届く": "発送", "納期": "発送",
+}
+
 # --- 軽量なキーワード検索機能 ---
 def search_content(question):
     all_pages = ALL_PAGES_DATA
@@ -19,36 +29,6 @@ def search_content(question):
         return [], []
 
     question_cleaned = re.sub(r'[^\w\s\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]', '', question)
-
-    # ▼▼▼【改善版】類義語辞書 ▼▼▼
-    synonym_map = {
-        # 一般的な言葉
-        "重さ": "重量",
-        "値段": "価格",
-        "金額": "価格",
-        "費用": "価格",
-        "大きさ": "寸法",
-        "サイズ": "寸法",
-        "長さ": "全長",
-        "高さ": "全長",
-
-        # 製品スペック関連
-        "耐荷重": "最大荷重",
-        "出力": "最大荷重",
-        "能力": "最大荷重",
-        "穴径": "ホール径",
-        "伸び": "ストローク",
-        "オイル量": "油量",
-        "オイル容量": "油量",
-        "タンク容量": "有効油量",
-        "流量": "吐出量",
-        "圧": "圧力",
-
-        # 配送・納期関連
-        "いつ届く": "発送",
-        "納期": "発送",
-    }
-    # ▲▲▲【ここまで】▲▲▲
 
     stop_words = [
         "の", "に", "は", "を", "た", "が", "で", "て", "と", "し", "れ", "さ", "ある", "いる", "も", "する", "から", "な", "へ", "より", "です", "ます", "でした", "ました",
@@ -63,12 +43,7 @@ def search_content(question):
 
     keywords_raw = [kw for kw in temp_question.split() if kw]
     
-    # ▼▼▼【ここから修正】類義語を変換する処理を追加 ▼▼▼
-    keywords = []
-    for kw in keywords_raw:
-        # 辞書に類義語があれば変換し、なければ元の単語を使用
-        keywords.append(synonym_map.get(kw, kw))
-    # ▲▲▲【ここまで修正】▲▲▲
+    keywords = [SYNONYM_MAP.get(kw, kw) for kw in keywords_raw]
 
     if not keywords:
         keywords = [question_cleaned]
@@ -122,6 +97,12 @@ def ask():
         context = f"--- ページタイトル: {main_page['title']} ---\n{snippet}\n\n"
         sources_data = [{"title": page['title'], "url": page['url']} for page in relevant_pages]
 
+        # ▼▼▼【ここから修正】AIに渡す質問文も類義語変換する ▼▼▼
+        question_for_ai = question
+        for key, value in SYNONYM_MAP.items():
+            question_for_ai = question_for_ai.replace(key, value)
+        # ▲▲▲【ここまで修正】▲▲▲
+
         prompt1 = (
             "あなたは藤原産業株式会社の製品について回答する、親切なアシスタントです。\n"
             "以下の参考情報だけを元にして、ユーザーからの質問に日本語で分かりやすく回答してください。\n"
@@ -130,7 +111,7 @@ def ask():
             "--- 参考情報 ---\n"
             f"{context}"
             "--- ユーザーの質問 ---\n"
-            f"{question}"
+            f"{question_for_ai}" # 変換後の質問を使用
         )
 
         answer1 = chat_with_openai(prompt1)
