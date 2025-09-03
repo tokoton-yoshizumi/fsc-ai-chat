@@ -2,16 +2,15 @@ from flask import Blueprint, request, jsonify
 from utils import load_existing_data
 from openai_api import chat_with_openai
 import re
-from sudachipy import tokenizer
-from sudachipy import dictionary
+from janome.tokenizer import Tokenizer
 
 api = Blueprint("api", __name__)
 
 ALL_PAGES_DATA = None
-tokenizer_obj = None
+t = None
 
 def initialize_data():
-    global ALL_PAGES_DATA, tokenizer_obj
+    global ALL_PAGES_DATA, t
     if ALL_PAGES_DATA is None:
         print("🔄 初回リクエスト：サイトのコンテンツデータを読み込んでいます...")
         ALL_PAGES_DATA = load_existing_data("site_content.json")
@@ -20,9 +19,9 @@ def initialize_data():
         else:
             print("⚠️ コンテンツデータが見つからないか、空です。")
     
-    if tokenizer_obj is None:
-        print("🔄 初回リクエスト：SudachiPy Tokenizerを初期化しています...")
-        tokenizer_obj = dictionary.Dictionary().create()
+    if t is None:
+        print("🔄 初回リクエスト：Janome Tokenizerを初期化しています...")
+        t = Tokenizer()
         print("✅ Tokenizerの初期化が完了しました。")
 
 SYNONYM_MAP = {
@@ -34,6 +33,7 @@ SYNONYM_MAP = {
 }
 
 def search_content(question):
+
     initialize_data()
     
     all_pages = ALL_PAGES_DATA
@@ -46,9 +46,12 @@ def search_content(question):
     for key, value in SYNONYM_MAP.items():
         question_synonymized = question_synonymized.replace(key, value)
     
-    mode = tokenizer.Tokenizer.SplitMode.C
-    tokens = tokenizer_obj.tokenize(question_synonymized, mode)
-    keywords = [m.normalized_form() for m in tokens if m.part_of_speech()[0] == '名詞']
+    tokens = t.tokenize(question_synonymized)
+    keywords = []
+    for token in tokens:
+        part_of_speech = token.part_of_speech.split(',')[0]
+        if part_of_speech == '名詞':
+            keywords.append(token.surface)
     
     if not keywords:
         keywords = [question_cleaned]
@@ -63,8 +66,10 @@ def search_content(question):
 
         for keyword in keywords:
             kw_lower = keyword.lower()
+            # ▼▼▼【ここを修正】タイトル一致のスコアを大幅にアップ ▼▼▼
             if kw_lower in page_title_lower:
                 score += 100
+            # ▲▲▲【ここまで修正】▲▲▲
             score += page_content_lower.count(kw_lower)
             
         if score > 0:
@@ -76,8 +81,6 @@ def search_content(question):
 
 @api.route("/ask", methods=["POST"])
 def ask():
-    initialize_data()
-
     data = request.json
     question = data.get("question")
 
@@ -121,6 +124,13 @@ def ask():
             f"{question_for_ai}"
         )
 
+        print("\n" + "="*50)
+        print("AIへの問い合わせ内容（1回目）")
+        print(f"参照ページ: {main_page['title']}")
+        print(f"AIに渡すコンテキスト（抜粋）:\n{best_snippet[:300]}...")
+        print(f"AIに渡す質問文: {question_for_ai}")
+        print("="*50 + "\n")
+
         answer1 = chat_with_openai(prompt1)
 
         if "情報なし" not in answer1:
@@ -133,7 +143,7 @@ def ask():
     
     caution_message = (
         '<div class="disclaimer-ai">'
-        "申し訳ありませんが、ご質問に関する情報は見つかりませんでした。<br>"
+        "申し訳ありませんが、ご質問に関する情報は見つかりませんでした。<br><br>"
         "<b>⚠️ご注意ください⚠️</b><br>"
         "以下の回答は、AIが持つ一般的な知識や公開されている情報に基づいた参考内容です。<br>"
         "そのため、藤原産業の公式な仕様・データではありません。<br>"
@@ -141,18 +151,16 @@ def ask():
         '</div>'
     )
 
-    # ▼▼▼【ここを修正】 "--- 注意書き ---" の行を削除 ▼▼▼
     prompt2 = (
         "あなたは、親切で優秀なAIアシスタントです。\n"
         "藤原産業株式会社のウェブサイト内では、以下の質問に関する情報が見つかりませんでした。\n"
         "あなたの一般的な知識を元にして、この質問に回答してください。\n"
-        "ただし、回答の一番最初に、以下のHTMLブロック形式の注意書きを改行などを一切挟まずにそのまま含めてください。\n"
+        "ただし、回答の一番最初に、以下のHTMLブロック形式の注意書きを**改行などを一切挟まずに**そのまま含めてください。\n"
         "注意書きのHTMLブロックの直後から、すぐに回答本文を始めてください。\n\n"
         f"{caution_message}\n\n"
         "--- ユーザーの質問 ---\n"
         f"{question}"
     )
-    # ▲▲▲【ここまで修正】▲▲▲
     
     answer2 = chat_with_openai(prompt2)
 
