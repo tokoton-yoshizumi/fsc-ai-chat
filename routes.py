@@ -45,14 +45,11 @@ def search_content(question):
         "また", "および", "しかし", "そして"
     ]
 
-    # ▼▼▼【ここを修正】ストップワードをスペースに置き換える ▼▼▼
     temp_question = question_synonymized
     for word in stop_words:
         temp_question = temp_question.replace(word, " ")
     
-    # スペースで区切ってキーワードリストを作成
     keywords = [kw for kw in temp_question.split() if kw]
-    # ▲▲▲【ここまで修正】▲▲▲
 
     if not keywords:
         keywords = [question_synonymized.strip()]
@@ -64,12 +61,27 @@ def search_content(question):
         score = 0
         page_title_lower = page['title'].lower()
         page_content_lower = page['content'].lower()
+        page_full_text = page_title_lower + " " + page_content_lower
 
+        # ▼▼▼【ここから修正】スコアリングロジックを改善 ▼▼▼
+        # 1. 質問に含まれるキーワードが全て存在するかチェック
+        all_keywords_found = True
+        for keyword in keywords:
+            if keyword.lower() not in page_full_text:
+                all_keywords_found = False
+                break
+        
+        # 2. 全てのキーワードが見つかったページに大きなボーナススコアを与える
+        if all_keywords_found:
+            score += 1000
+
+        # 3. 従来のスコアを加算して順位を微調整
         for keyword in keywords:
             kw_lower = keyword.lower()
             if kw_lower in page_title_lower:
                 score += 100
             score += page_content_lower.count(kw_lower)
+        # ▲▲▲【ここまで修正】▲▲▲
             
         if score > 0:
             scored_pages.append({"score": score, "page": page})
