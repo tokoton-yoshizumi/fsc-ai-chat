@@ -1,7 +1,10 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, render_template, abort
 from utils import load_existing_data
 from openai_api import chat_with_openai
 import re
+import os
+from datetime import datetime
+import pytz
 
 api = Blueprint("api", __name__)
 
@@ -63,25 +66,20 @@ def search_content(question):
         page_content_lower = page['content'].lower()
         page_full_text = page_title_lower + " " + page_content_lower
 
-        # ▼▼▼【ここから修正】スコアリングロジックを改善 ▼▼▼
-        # 1. 質問に含まれるキーワードが全て存在するかチェック
         all_keywords_found = True
         for keyword in keywords:
             if keyword.lower() not in page_full_text:
                 all_keywords_found = False
                 break
         
-        # 2. 全てのキーワードが見つかったページに大きなボーナススコアを与える
         if all_keywords_found:
             score += 1000
 
-        # 3. 従来のスコアを加算して順位を微調整
         for keyword in keywords:
             kw_lower = keyword.lower()
             if kw_lower in page_title_lower:
                 score += 100
             score += page_content_lower.count(kw_lower)
-        # ▲▲▲【ここまで修正】▲▲▲
             
         if score > 0:
             scored_pages.append({"score": score, "page": page})
@@ -98,12 +96,20 @@ def ask():
     if not question:
         return jsonify({"error": "質問が空です"}), 400
 
+    # ▼▼▼【ここから追加】質問をログファイルに記録する処理 ▼▼▼
+    jst = pytz.timezone('Asia/Tokyo')
+    timestamp = datetime.now(jst).strftime('%Y-%m-%d %H:%M:%S')
+    with open("question_log.txt", "a", encoding="utf-8") as f:
+        f.write(f"[{timestamp}] {question}\n")
+    # ▲▲▲【ここまで追加】▲▲▲
+
     relevant_pages, keywords = search_content(question)
 
     if relevant_pages:
         context = ""
         for page in relevant_pages:
             context += f"--- ページタイトル: {page['title']} ---\n{page['content']}\n\n"
+        
         sources_data = [{"title": page['title'], "url": page['url']} for page in relevant_pages]
 
         question_for_ai = question
@@ -121,16 +127,8 @@ def ask():
             f"{question_for_ai}"
         )
 
-        print("\n" + "="*50)
-        print("AIへの問い合わせ内容（1回目）")
-        print(f"参照ページ: {[page['title'] for page in relevant_pages]}")
-        print(f"AIに渡すコンテキスト（抜粋）:\n{context[:300]}...")
-        print(f"AIに渡す質問文: {question_for_ai}")
-        print("="*50 + "\n")
-
         answer1 = chat_with_openai(prompt1)
         
-
         if "情報なし" not in answer1:
             return jsonify({
                 "bot_response": answer1,
@@ -166,3 +164,26 @@ def ask():
         "bot_response": answer2,
         "sources": []
     })
+
+# ▼▼▼【ここから追加】ログ閲覧ページ用の新しいルート ▼▼▼
+@api.route("/view-log/<password>", methods=["GET"])
+def view_log(password):
+    correct_password = os.environ.get("LOG_DOWNLOAD_PASSWORD")
+    if not correct_password or password != correct_password:
+        abort(404)
+
+    logs = []
+    try:
+        with open("question_log.txt", "r", encoding="utf-8") as f:
+            for line in f:
+                parts = line.strip().split("] ")
+                if len(parts) == 2:
+                    timestamp = parts[0].strip("[")
+                    question = parts[1]
+                    logs.append({"timestamp": timestamp, "question": question})
+        logs.reverse()
+    except FileNotFoundError:
+        print("ログファイルが見つかりません。")
+
+    return render_template("log_viewer.html", logs=logs)
+# ▲▲▲【ここまで追加】▲▲▲

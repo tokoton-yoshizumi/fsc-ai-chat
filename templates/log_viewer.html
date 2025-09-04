@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AIチャットボット 質問ログ</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            margin: 2em;
+            background-color: #f8f9fa;
+            color: #343a40;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: auto;
+            background: white;
+            padding: 2em;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+        }
+
+        h1 {
+            color: #0465b2;
+            border-bottom: 2px solid #dee2e6;
+            padding-bottom: 0.5em;
+        }
+
+        ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        li {
+            background-color: #f1f3f5;
+            border-radius: 4px;
+            padding: 0.8em 1.2em;
+            margin-bottom: 0.8em;
+            font-size: 1.1em;
+        }
+
+        .timestamp {
+            font-size: 0.8em;
+            color: #6c757d;
+            display: block;
+            margin-bottom: 0.3em;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>AIチャットボット 質問ログ</h1>
+        {% if logs %}
+        <ul>
+            {% for log in logs %}
+            <li>
+                <span class="timestamp">{{ log.timestamp }}</span>
+                {{ log.question }}
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p>ログはまだありません。</p>
+        {% endif %}
+    </div>
+</body>
+
+</html>
