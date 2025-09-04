@@ -1,15 +1,12 @@
 from flask import Flask, render_template
 from flask_cors import CORS
 from routes import api  # `routes.py` の Blueprint をインポート
-from scheduler import start_scheduler  # スケジューラーをインポート
 
 app = Flask(__name__)
 CORS(app)
 
 app.register_blueprint(api)  # `routes.py` を Blueprint として登録
 
-# ★★★ スケジューラーをここで開始する ★★★
-start_scheduler()
 
 @app.route("/")
 def index():
