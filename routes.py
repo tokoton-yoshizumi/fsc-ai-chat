@@ -101,23 +101,9 @@ def ask():
     relevant_pages, keywords = search_content(question)
 
     if relevant_pages:
-        main_page = relevant_pages[0]
-        full_content = main_page['content']
-        best_snippet = ""
-        max_keyword_count = 0
-        
-        for i in range(0, len(full_content), 300):
-            snippet_candidate = full_content[i:i+1500]
-            keyword_count = sum(snippet_candidate.lower().count(kw.lower()) for kw in keywords)
-            
-            if keyword_count > max_keyword_count:
-                max_keyword_count = keyword_count
-                best_snippet = snippet_candidate
-
-        if not best_snippet:
-            best_snippet = full_content[:1500]
-
-        context = f"--- ページタイトル: {main_page['title']} ---\n{best_snippet}\n\n"
+        context = ""
+        for page in relevant_pages:
+            context += f"--- ページタイトル: {page['title']} ---\n{page['content']}\n\n"
         sources_data = [{"title": page['title'], "url": page['url']} for page in relevant_pages]
 
         question_for_ai = question
@@ -135,7 +121,15 @@ def ask():
             f"{question_for_ai}"
         )
 
+        print("\n" + "="*50)
+        print("AIへの問い合わせ内容（1回目）")
+        print(f"参照ページ: {[page['title'] for page in relevant_pages]}")
+        print(f"AIに渡すコンテキスト（抜粋）:\n{context[:300]}...")
+        print(f"AIに渡す質問文: {question_for_ai}")
+        print("="*50 + "\n")
+
         answer1 = chat_with_openai(prompt1)
+        
 
         if "情報なし" not in answer1:
             return jsonify({
